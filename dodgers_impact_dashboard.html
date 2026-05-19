@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodgers Impact Dashboard — Ohtani & Yamamoto Era</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --dodger-blue: #005A9C;
+    --dodger-blue-light: #1a6fad;
+    --dodger-red: #EF3E42;
+    --gold: #C9A84C;
+    --bg: #0a0d12;
+    --bg-card: #0f1318;
+    --bg-card2: #141820;
+    --border: rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.14);
+    --text-primary: #f0f2f5;
+    --text-secondary: #8b92a0;
+    --text-muted: #4a5060;
+    --teal: #0fb8a0;
+    --amber: #e8a020;
+    --purple: #7c6fcd;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-weight: 300;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE TEXTURE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: .4;
+  }
+
+  /* ── MASTHEAD ── */
+  .masthead {
+    position: relative;
+    padding: 3.5rem 2.5rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .masthead::after {
+    content: '';
+    position: absolute;
+    top: -60px; right: -80px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,90,156,.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .masthead-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 2rem;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--dodger-blue-light);
+    margin-bottom: .5rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 7vw, 5.5rem);
+    letter-spacing: .03em;
+    line-height: .95;
+    color: var(--text-primary);
+  }
+
+  h1 span { color: var(--dodger-blue-light); }
+
+  .masthead-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 1rem;
+    max-width: 560px;
+    line-height: 1.7;
+  }
+
+  .masthead-meta {
+    text-align: right;
+  }
+
+  .contract-stack { display: flex; flex-direction: column; gap: 8px; }
+
+  .contract-pill {
+    background: var(--bg-card2);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 8px 16px;
+    text-align: right;
+  }
+
+  .contract-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .contract-val {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    letter-spacing: .04em;
+    color: var(--gold);
+    line-height: 1.1;
+  }
+
+  .contract-sub { font-size: 11px; color: var(--text-muted); }
+
+  .total-pill {
+    background: var(--dodger-blue);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 6px;
+    padding: 10px 16px;
+    text-align: right;
+  }
+
+  .total-pill .contract-name { color: rgba(255,255,255,.6); }
+  .total-pill .contract-val { color: #fff; font-size: 2.2rem; }
+
+  /* ── ERA SELECTOR ── */
+  .era-bar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .era-bar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2.5rem;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+  }
+
+  .era-btn {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 13px;
+    padding: 14px 22px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+    letter-spacing: .01em;
+  }
+
+  .era-btn:hover { color: var(--text-secondary); }
+
+  .era-btn.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--dodger-blue-light);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 2.5rem 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 1.25rem;
+    margin-top: 2.5rem;
+    padding-bottom: .75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: .1em;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    letter-spacing: .05em;
+    color: var(--text-primary);
+  }
+
+  .section-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+
+  .badge-core {
+    background: rgba(0,90,156,.25);
+    color: #6ab0e8;
+    border: 1px solid rgba(0,90,156,.4);
+  }
+
+  .badge-sec {
+    background: rgba(15,184,160,.12);
+    color: #0fb8a0;
+    border: 1px solid rgba(15,184,160,.25);
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: border-color .2s;
+  }
+
+  .stat-card:hover { border-color: var(--border-bright); }
+
+  .stat-era {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    letter-spacing: .04em;
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+
+  .stat-delta {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  .delta-up { color: var(--teal); }
+  .delta-neutral { color: var(--text-muted); }
+
+  /* ── CHART CONTAINERS ── */
+  .chart-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .lsq {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* ── TWO-COL LAYOUT ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ── TREND CARDS ── */
+  .trend-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .trend-card-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .trend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .trend-era { min-width: 72px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em; }
+
+  .trend-track {
+    flex: 1;
+    height: 7px;
+    background: rgba(255,255,255,.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .trend-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .trend-val { min-width: 50px; text-align: right; font-family: var(--font-mono); font-size: 10px; }
+
+  /* ── ENGAGEMENT GRID ── */
+  .engage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+
+  .engage-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: border-color .2s;
+  }
+
+  .engage-card:hover { border-color: var(--border-bright); }
+
+  .engage-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+    opacity: .6;
+  }
+
+  .engage-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+
+  .engage-val {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    letter-spacing: .04em;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .engage-sub { font-size: 11px; color: var(--teal); margin-top: 3px; }
+
+  /* ── ROI BARS ── */
+  .roi-section { margin-bottom: 1rem; }
+
+  .roi-row { margin-bottom: 12px; }
+
+  .roi-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .roi-val { font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); }
+
+  .roi-track {
+    height: 8px;
+    background: rgba(255,255,255,.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .roi-fill { height: 100%; border-radius: 4px; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+
+  /* ── SECONDARY SEPARATOR ── */
+  .secondary-intro {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 2rem 0 .5rem;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* ── VERDICT ── */
+  .verdict {
+    background: var(--bg-card2);
+    border: 1px solid var(--border-bright);
+    border-top: 3px solid var(--gold);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .verdict-title {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    letter-spacing: .05em;
+    color: var(--gold);
+    margin-bottom: .75rem;
+  }
+
+  .verdict-body {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+  }
+
+  .verdict-body strong { color: var(--text-primary); font-weight: 500; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2.5rem;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: .04em;
+  }
+
+  /* ── ERA HIGHLIGHT ── */
+  .era-highlight {
+    background: rgba(0,90,156,.08);
+    border: 1px solid rgba(0,90,156,.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    display: none;
+  }
+
+  .era-highlight.show { display: block; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .anim { animation: fadeUp .4s ease both; }
+
+  @media (max-width: 700px) {
+    .masthead-inner { grid-template-columns: 1fr; }
+    .masthead-meta { text-align: left; }
+    .contract-stack { flex-direction: row; flex-wrap: wrap; }
+    .two-col { grid-template-columns: 1fr; }
+    main { padding: 1.5rem 1rem 3rem; }
+    .masthead { padding: 2rem 1rem 1.5rem; }
+    .era-bar-inner { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <p class="eyebrow">Business Impact Analysis · Los Angeles Dodgers</p>
+      <h1>THE <span>OHTANI</span><br>EFFECT</h1>
+      <p class="masthead-sub">How signing Shohei Ohtani and Yoshinobu Yamamoto transformed the Dodgers from a great franchise into a global sports business — and whether spending ~$1 billion in contracts was worth it.</p>
+    </div>
+    <div class="masthead-meta">
+      <div class="contract-stack">
+        <div class="contract-pill">
+          <p class="contract-name">Shohei Ohtani · Dec 2023</p>
+          <p class="contract-val">$700M</p>
+          <p class="contract-sub">10 years · heavily deferred</p>
+        </div>
+        <div class="contract-pill">
+          <p class="contract-name">Yoshinobu Yamamoto · Dec 2023</p>
+          <p class="contract-val">$325M</p>
+          <p class="contract-sub">12 years</p>
+        </div>
+        <div class="total-pill">
+          <p class="contract-name">Combined commitment</p>
+          <p class="contract-val">~$1.03B</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ERA SELECTOR -->
+<nav class="era-bar" aria-label="Time period selector">
+  <div class="era-bar-inner">
+    <button class="era-btn active" onclick="setEra(0)">2022–23 · Baseline</button>
+    <button class="era-btn" onclick="setEra(1)">2024 · Year 1</button>
+    <button class="era-btn" onclick="setEra(2)">2025–26 · Today</button>
+    <button class="era-btn" onclick="setEra(3)">2027–33 · Projected</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ERA CONTEXT BANNERS -->
+<div id="era0" class="era-highlight show">
+  <strong>Baseline (2022–23):</strong> Dodgers were already elite — $4.8B valuation, back-to-back NL West titles, strong local TV revenue. But international presence was limited, social growth had plateaued, and there were fewer than 5 Japanese brand sponsors.
+</div>
+<div id="era1" class="era-highlight">
+  <strong>Year 1 (2024):</strong> Ohtani won NL MVP and became the first player in baseball history to hit 50 HR and steal 50 bases in one season. Dodgers won the World Series. Revenue crossed $1 billion — an MLB first. $70M in new Japanese sponsorships. Jersey sales broke Fanatics' all-time record within 48 hours.
+</div>
+<div id="era2" class="era-highlight">
+  <strong>Today (2025–26):</strong> Back-to-back World Series champions. First team to draw 4 million fans since 2008. Franchise value at $7.8B. 20 Japanese brand sponsors. Ohtani returned to two-way duties and is projected to earn $127M in 2026 from salary and endorsements combined.
+</div>
+<div id="era3" class="era-highlight">
+  <strong>Projected (2027–33):</strong> Mid-contract prime years for both players. Deferred payments on Ohtani's deal don't start until 2034, keeping current cash outlay minimal. Continued franchise value appreciation, growing Japan market, and sustained on-field contention expected.
+</div>
+
+<!-- ══ CORE METRICS ══════════════════════════════════════ -->
+
+<!-- 1. SOCIAL MEDIA -->
+<div class="section-header">
+  <span class="section-num">01</span>
+  <h2 class="section-title">Social Media Growth</h2>
+  <span class="section-badge badge-core">Core metric</span>
+</div>
+
+<div class="stat-grid" id="social-stats"></div>
+
+<div class="chart-box">
+  <div class="chart-legend">
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#1a6fad"></span>Dodgers Instagram (M)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#EF3E42"></span>Ohtani personal IG (M)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:rgba(255,255,255,.3);border:1px dashed rgba(255,255,255,.3)"></span>MLB team avg (M)</span>
+  </div>
+  <div class="chart-wrap" style="height:220px">
+    <canvas id="cSocial" role="img" aria-label="Line chart showing Dodgers and Ohtani social media follower growth vs MLB average from 2022 to 2030">Dodgers: 3M→6.2M→10M (proj). Ohtani: 1.5M→7.5M. MLB avg: ~2M flat.</canvas>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 2. GOOGLE TRENDS -->
+<div class="section-header">
+  <span class="section-num">02</span>
+  <h2 class="section-title">Search &amp; Global Interest</h2>
+  <span class="section-badge badge-core">Core metric</span>
+</div>
+
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem;line-height:1.7">Indexed search interest (0–100 scale) and Japan TV viewership. The signing triggered a historic global spike — Japan game viewership rivaled the US Super Bowl at peak.</p>
+
+<div class="two-col" style="margin-bottom:1rem">
+  <div class="trend-card">
+    <p class="trend-card-label">"Shohei Ohtani" — global search interest</p>
+    <div class="trend-row"><span class="trend-era">2022–23</span><div class="trend-track"><div class="trend-fill" style="width:30%;background:#1a6fad"></div></div><span class="trend-val">30 / 100</span></div>
+    <div class="trend-row"><span class="trend-era">Dec 2023</span><div class="trend-track"><div class="trend-fill" style="width:100%;background:#005A9C"></div></div><span class="trend-val" style="color:var(--gold)">100 peak</span></div>
+    <div class="trend-row"><span class="trend-era">2024</span><div class="trend-track"><div class="trend-fill" style="width:85%;background:#1a6fad"></div></div><span class="trend-val">85 avg</span></div>
+    <div class="trend-row"><span class="trend-era">2025–26</span><div class="trend-track"><div class="trend-fill" style="width:75%;background:#378ADD"></div></div><span class="trend-val">75 avg</span></div>
+  </div>
+  <div class="trend-card">
+    <p class="trend-card-label">"LA Dodgers" — global search interest</p>
+    <div class="trend-row"><span class="trend-era">2022–23</span><div class="trend-track"><div class="trend-fill" style="width:40%;background:#0fb8a0"></div></div><span class="trend-val">40 / 100</span></div>
+    <div class="trend-row"><span class="trend-era">Dec 2023</span><div class="trend-track"><div class="trend-fill" style="width:95%;background:#0fb8a0"></div></div><span class="trend-val" style="color:var(--gold)">95 peak</span></div>
+    <div class="trend-row"><span class="trend-era">2024</span><div class="trend-track"><div class="trend-fill" style="width:80%;background:#0fb8a0"></div></div><span class="trend-val">80 avg</span></div>
+    <div class="trend-row"><span class="trend-era">2025–26</span><div class="trend-track"><div class="trend-fill" style="width:72%;background:#5DCAA5"></div></div><span class="trend-val">72 avg</span></div>
+  </div>
+  <div class="trend-card">
+    <p class="trend-card-label">Japan TV viewers per Dodgers game</p>
+    <div class="trend-row"><span class="trend-era">2022–23</span><div class="trend-track"><div class="trend-fill" style="width:8%;background:#C9A84C"></div></div><span class="trend-val">~2M</span></div>
+    <div class="trend-row"><span class="trend-era">Tokyo '24</span><div class="trend-track"><div class="trend-fill" style="width:100%;background:#C9A84C"></div></div><span class="trend-val" style="color:var(--gold)">25M+</span></div>
+    <div class="trend-row"><span class="trend-era">2024 WS</span><div class="trend-track"><div class="trend-fill" style="width:80%;background:#C9A84C"></div></div><span class="trend-val">20M+</span></div>
+    <div class="trend-row"><span class="trend-era">2025–26</span><div class="trend-track"><div class="trend-fill" style="width:86%;background:#e8a020"></div></div><span class="trend-val">~22M avg</span></div>
+  </div>
+  <div class="trend-card">
+    <p class="trend-card-label">"Yoshinobu Yamamoto" — search interest</p>
+    <div class="trend-row"><span class="trend-era">2022–23</span><div class="trend-track"><div class="trend-fill" style="width:20%;background:#7c6fcd"></div></div><span class="trend-val">20 / 100</span></div>
+    <div class="trend-row"><span class="trend-era">Dec 2023</span><div class="trend-track"><div class="trend-fill" style="width:80%;background:#7c6fcd"></div></div><span class="trend-val">80 peak</span></div>
+    <div class="trend-row"><span class="trend-era">2024</span><div class="trend-track"><div class="trend-fill" style="width:45%;background:#9688d8"></div></div><span class="trend-val">45 (injury)</span></div>
+    <div class="trend-row"><span class="trend-era">2025–26</span><div class="trend-track"><div class="trend-fill" style="width:60%;background:#7c6fcd"></div></div><span class="trend-val">60 avg</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 3. FAN ENGAGEMENT -->
+<div class="section-header">
+  <span class="section-num">03</span>
+  <h2 class="section-title">Fan Engagement Indicators</h2>
+  <span class="section-badge badge-core">Core metric</span>
+</div>
+
+<div class="engage-grid">
+  <div class="engage-card">
+    <div class="engage-icon">🏆</div>
+    <p class="engage-label">World Series titles</p>
+    <p class="engage-val">2024 & 2025</p>
+    <p class="engage-sub">Back-to-back champions</p>
+  </div>
+  <div class="engage-card">
+    <div class="engage-icon">👕</div>
+    <p class="engage-label">Jersey sales</p>
+    <p class="engage-val">All-time #1</p>
+    <p class="engage-sub">Fanatics record · 48hrs</p>
+  </div>
+  <div class="engage-card">
+    <div class="engage-icon">🎟</div>
+    <p class="engage-label">Avg ticket price</p>
+    <p class="engage-val">$87 → $99+</p>
+    <p class="engage-sub">Now #1 in MLB</p>
+  </div>
+  <div class="engage-card">
+    <div class="engage-icon">⭐</div>
+    <p class="engage-label">NL MVP awards</p>
+    <p class="engage-val">3rd career</p>
+    <p class="engage-sub">50 HR / 50 SB season</p>
+  </div>
+  <div class="engage-card">
+    <div class="engage-icon">🎎</div>
+    <p class="engage-label">Bobblehead nights '25</p>
+    <p class="engage-val">23 nights</p>
+    <p class="engage-sub">4 Ohtani editions</p>
+  </div>
+  <div class="engage-card">
+    <div class="engage-icon">🚌</div>
+    <p class="engage-label">Road attendance avg</p>
+    <p class="engage-val">35,703</p>
+    <p class="engage-sub">#1 MLB road draw</p>
+  </div>
+</div>
+
+<!-- ══ SECONDARY SEPARATOR ══════════════════════════════ -->
+<div class="secondary-intro">
+  Secondary metrics below provide supporting business context — franchise valuation, merchandise, sponsorships, and attendance numbers that quantify the ROI on the ~$1B investment.
+</div>
+
+<!-- 4. FRANCHISE VALUE -->
+<div class="section-header">
+  <span class="section-num">04</span>
+  <h2 class="section-title">Franchise Valuation</h2>
+  <span class="section-badge badge-sec">Secondary</span>
+</div>
+
+<div class="stat-grid" id="fv-stats"></div>
+
+<div class="chart-box">
+  <div class="chart-legend">
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#1a6fad"></span>Dodgers ($B)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:rgba(255,255,255,.25);border:1px dashed rgba(255,255,255,.25)"></span>Yankees benchmark ($B)</span>
+  </div>
+  <div class="chart-wrap" style="height:200px">
+    <canvas id="cFV" role="img" aria-label="Line chart of Dodgers franchise value from $4.8B in 2023 to $7.8B in 2026 projected $10B+">Dodgers: $4.8B (2023), $6.2B (2024), $7.8B (2026), $10.5B (2030 proj). Yankees: ~$7-8.5B throughout.</canvas>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 5. MERCHANDISE -->
+<div class="section-header">
+  <span class="section-num">05</span>
+  <h2 class="section-title">Merchandise &amp; Endorsements</h2>
+  <span class="section-badge badge-sec">Secondary</span>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card"><p class="stat-era">Pre-Ohtani MLB record</p><p class="stat-value">~$10M</p><p class="stat-delta delta-neutral">Annual endorsement baseline</p></div>
+  <div class="stat-card"><p class="stat-era">Ohtani endorsements 2024</p><p class="stat-value">~$100M</p><p class="stat-delta delta-up">10× pre-MLB record</p></div>
+  <div class="stat-card"><p class="stat-era">Ohtani total earnings 2026</p><p class="stat-value">$127M</p><p class="stat-delta delta-up">Salary + endorsements</p></div>
+  <div class="stat-card"><p class="stat-era">Jersey sales</p><p class="stat-value">Record</p><p class="stat-delta delta-up">Fanatics all-time #1 (48hr)</p></div>
+</div>
+
+<hr class="divider">
+
+<!-- 6. SPONSORSHIPS -->
+<div class="section-header">
+  <span class="section-num">06</span>
+  <h2 class="section-title">Sponsorship Revenue</h2>
+  <span class="section-badge badge-sec">Secondary</span>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card"><p class="stat-era">2022–23 baseline</p><p class="stat-value">~$130M</p><p class="stat-delta delta-neutral">~4 Japanese brands</p></div>
+  <div class="stat-card"><p class="stat-era">2024 year 1</p><p class="stat-value">~$200M</p><p class="stat-delta delta-up">+$70M new Japan revenue</p></div>
+  <div class="stat-card"><p class="stat-era">2025–26 today</p><p class="stat-value">$200M+</p><p class="stat-delta delta-up">20 Japanese brands</p></div>
+  <div class="stat-card"><p class="stat-era">2027–33 projected</p><p class="stat-value">$250–300M</p><p class="stat-delta delta-up">Growing Japan market</p></div>
+</div>
+
+<div class="chart-box">
+  <div class="chart-legend">
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#EF3E42"></span>Japanese brand sponsors ($M)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#1a6fad"></span>Other sponsorship ($M)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:rgba(255,255,255,.25);border:1px dashed rgba(255,255,255,.25)"></span>MLB avg total</span>
+  </div>
+  <div class="chart-wrap" style="height:220px">
+    <canvas id="cSpon" role="img" aria-label="Stacked bar chart showing Dodgers sponsorship revenue by Japanese and non-Japanese brands from 2022 to 2030 projected">2022: $5M Japan + $125M other. 2024: $70M Japan + $130M other. 2025: $85M Japan. 2027 proj: $270M total.</canvas>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 7. ATTENDANCE -->
+<div class="section-header">
+  <span class="section-num">07</span>
+  <h2 class="section-title">Attendance &amp; Gate Revenue</h2>
+  <span class="section-badge badge-sec">Secondary</span>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card"><p class="stat-era">2022–23 home</p><p class="stat-value">3.86M</p><p class="stat-delta delta-neutral">Led MLB both years</p></div>
+  <div class="stat-card"><p class="stat-era">2025 home attendance</p><p class="stat-value">4.01M</p><p class="stat-delta delta-up">First 4M team since 2008</p></div>
+  <div class="stat-card"><p class="stat-era">Gate revenue / game (2024)</p><p class="stat-value">$4.29M</p><p class="stat-delta delta-up">#1 in all of MLB</p></div>
+  <div class="stat-card"><p class="stat-era">Road avg (2025)</p><p class="stat-value">35,703</p><p class="stat-delta delta-up">#1 MLB road draw</p></div>
+</div>
+
+<div class="chart-box">
+  <div class="chart-legend">
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#7c6fcd"></span>Home attendance (M)</span>
+    <span style="display:flex;align-items:center;gap:6px"><span class="lsq" style="background:#0fb8a0;border:1px dashed #0fb8a0"></span>Gate revenue / game ($M) →</span>
+  </div>
+  <div class="chart-wrap" style="height:200px">
+    <canvas id="cAtt" role="img" aria-label="Dual axis chart of home attendance and gate revenue per game 2022 to 2027 projected">Attendance: 3.86M–4.01M–4.1M proj. Gate: $3.1M–$4.29M–$5M proj.</canvas>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ROI SUMMARY -->
+<div class="section-header">
+  <span class="section-num">08</span>
+  <h2 class="section-title">ROI Summary</h2>
+  <span class="section-badge badge-core">Verdict</span>
+</div>
+
+<div class="roi-section chart-box">
+  <div class="roi-row">
+    <div class="roi-meta"><span>Japanese sponsorships — year 1 alone</span><span class="roi-val">$70M / yr</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:23%;background:#1a6fad"></div></div>
+  </div>
+  <div class="roi-row">
+    <div class="roi-meta"><span>Franchise value appreciation since signing</span><span class="roi-val">$3.0B gain</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:100%;background:#0fb8a0"></div></div>
+  </div>
+  <div class="roi-row">
+    <div class="roi-meta"><span>Gate revenue uplift — led MLB 2024</span><span class="roi-val">$4.29M / game</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:50%;background:#EF3E42"></div></div>
+  </div>
+  <div class="roi-row">
+    <div class="roi-meta"><span>Ohtani personal endorsements (2026)</span><span class="roi-val">~$127M / yr</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:42%;background:#C9A84C"></div></div>
+  </div>
+  <div class="roi-row">
+    <div class="roi-meta"><span>2025 total sponsorship revenue</span><span class="roi-val">$200M+</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:67%;background:#7c6fcd"></div></div>
+  </div>
+  <div class="roi-row">
+    <div class="roi-meta"><span>Japan viewership peak per game</span><span class="roi-val">25M+ viewers</span></div>
+    <div class="roi-track"><div class="roi-fill" style="width:83%;background:#e8a020"></div></div>
+  </div>
+</div>
+
+<div class="verdict">
+  <p class="verdict-title">Verdict: the ~$1B spend is paying off — by a large margin</p>
+  <p class="verdict-body">
+    The contracts are brilliantly structured. <strong>Ohtani collects just $2M per year through 2033</strong> — back-loaded to $68M annually starting 2034 — making this effectively an interest-free loan to the franchise during his peak playing years.
+    <br><br>
+    Year 1 alone returned <strong>$70M in new Japanese sponsorships</strong>, pushed total revenue past <strong>$1 billion</strong> (an MLB first), and delivered a World Series championship. Franchise value has grown by <strong>~$3 billion</strong> since the signings — roughly 3× the present value of both contracts combined (~$462M NPV for Ohtani alone at 3% inflation discount).
+    <br><br>
+    Social media, Google search, and Japan viewership data confirm this isn't just domestic hype: the Dodgers have built a genuinely global audience. The sponsorship data alone — from 4 Japanese brands pre-signing to 20 today — shows the commercial infrastructure now in place.
+    <br><br>
+    <strong>The Ohtani and Yamamoto signings are already among the highest-ROI transactions in sports business history.</strong>
+  </p>
+</div>
+
+</main>
+
+<footer>
+  Sources: Forbes · Sportico · CNBC · SponsorUnited · MLB · Statista · Fox Sports · The Big Lead &nbsp;|&nbsp;
+  Google Trends values are indexed estimates based on reported data &nbsp;|&nbsp;
+  Projections are analyst-trend extrapolations &nbsp;|&nbsp;
+  Updated May 2026
+</footer>
+
+<script>
+const ERAS = ['2022–23\n(baseline)', 'Dec 2023\n(signing)', '2024\n(year 1)', '2025–26\n(today)', '2027–28\n(proj.)', '2030–33\n(proj.)'];
+const tickCfg = { color:'rgba(255,255,255,.35)', font:{ size:11, family:'DM Mono, monospace' }, maxRotation:30 };
+const gridCfg = { color:'rgba(255,255,255,.06)' };
+const noLegend = { legend:{ display:false }, tooltip:{ backgroundColor:'rgba(15,19,24,.95)', titleColor:'#f0f2f5', bodyColor:'#8b92a0', borderColor:'rgba(255,255,255,.1)', borderWidth:1 } };
+const defScales = { x:{ ticks:tickCfg, grid:gridCfg }, y:{ ticks:tickCfg, grid:gridCfg } };
+
+new Chart(document.getElementById('cSocial'),{
+  type:'line',
+  data:{
+    labels:['2022','2023','2024','2025','2026','2028 proj','2031 proj'],
+    datasets:[
+      { label:'Dodgers Instagram (M)', data:[3,3.5,5,6,6.2,8,10], borderColor:'#1a6fad', backgroundColor:'transparent', pointStyle:'circle', borderWidth:2, pointRadius:3, tension:.35 },
+      { label:'Ohtani personal IG (M)', data:[1.5,3.5,6.5,7.2,7.5,9,11], borderColor:'#EF3E42', backgroundColor:'transparent', pointStyle:'rectRot', borderDash:[5,3], borderWidth:2, pointRadius:3, tension:.35 },
+      { label:'MLB team avg (M)', data:[2,2.1,2.3,2.4,2.5,2.6,2.7], borderColor:'rgba(255,255,255,.25)', backgroundColor:'transparent', pointStyle:'triangle', borderDash:[2,5], borderWidth:1, pointRadius:2, tension:.35 }
+    ]
+  },
+  options:{ responsive:true, maintainAspectRatio:false, plugins:noLegend, scales:{ x:{ ticks:{...tickCfg,autoSkip:false}, grid:gridCfg }, y:{ ticks:{...tickCfg,callback:v=>v+'M'}, grid:gridCfg } } }
+});
+
+new Chart(document.getElementById('cFV'),{
+  type:'line',
+  data:{
+    labels:['2022','2023','2024','2025','2026','2028 proj','2031 proj'],
+    datasets:[
+      { label:'Dodgers ($B)', data:[4.08,4.8,6.2,6.9,7.8,9,10.5], borderColor:'#1a6fad', backgroundColor:'transparent', pointStyle:'circle', borderWidth:2, pointRadius:3, tension:.35 },
+      { label:'Yankees ($B)', data:[6.75,7.1,7.6,8.0,8.4,9,9.8], borderColor:'rgba(255,255,255,.25)', backgroundColor:'transparent', pointStyle:'rect', borderDash:[5,3], borderWidth:1.5, pointRadius:2, tension:.35 }
+    ]
+  },
+  options:{ responsive:true, maintainAspectRatio:false, plugins:noLegend, scales:{ x:{ ticks:{...tickCfg,autoSkip:false}, grid:gridCfg }, y:{ ticks:{...tickCfg,callback:v=>'$'+v+'B'}, grid:gridCfg, min:3 } } }
+});
+
+new Chart(document.getElementById('cSpon'),{
+  type:'bar',
+  data:{
+    labels:['2022','2023','2024','2025','2027 proj'],
+    datasets:[
+      { label:'Japanese brands ($M)', data:[5,5,70,85,120], backgroundColor:'rgba(239,62,66,.75)', borderWidth:0 },
+      { label:'Other sponsorship ($M)', data:[125,125,130,120,155], backgroundColor:'rgba(26,111,173,.75)', borderWidth:0 }
+    ]
+  },
+  options:{ responsive:true, maintainAspectRatio:false, plugins:noLegend, scales:{ x:{ stacked:true, ticks:{...tickCfg,autoSkip:false}, grid:gridCfg }, y:{ stacked:true, ticks:{...tickCfg,callback:v=>'$'+v+'M'}, grid:gridCfg } } }
+});
+
+new Chart(document.getElementById('cAtt'),{
+  type:'bar',
+  data:{
+    labels:['2022','2023','2024','2025','2027 proj'],
+    datasets:[
+      { label:'Home attendance (M)', data:[3.86,3.86,3.86,4.01,4.1], backgroundColor:'rgba(124,111,205,.8)', borderWidth:0, yAxisID:'y' },
+      { label:'Gate revenue/game ($M)', data:[3.1,3.4,4.29,4.5,5.0], type:'line', borderColor:'#0fb8a0', backgroundColor:'transparent', pointStyle:'rectRot', borderDash:[5,3], borderWidth:2, pointRadius:4, yAxisID:'y2', tension:.3 }
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, plugins:noLegend,
+    scales:{
+      x:{ ticks:{...tickCfg,autoSkip:false}, grid:gridCfg },
+      y:{ ticks:{...tickCfg,callback:v=>v+'M'}, grid:gridCfg, min:3, max:5 },
+      y2:{ position:'right', ticks:{...tickCfg,callback:v=>'$'+v+'M'}, grid:{display:false}, min:2, max:6 }
+    }
+  }
+});
+
+// Social stats by era
+const socialData = [
+  [
+    {era:'2022–23 (baseline)', value:'~3M', delta:'Instagram followers', cls:'delta-neutral'},
+    {era:'Twitter / X followers', value:'2.5M', delta:'Baseline', cls:'delta-neutral'},
+    {era:'YouTube subscribers', value:'~500K', delta:'Baseline', cls:'delta-neutral'},
+    {era:'Ohtani personal IG', value:'~1.5M', delta:'At Angels', cls:'delta-neutral'},
+  ],
+  [
+    {era:'Dec 2023 IG spike', value:'+2M', delta:'Signing announcement', cls:'delta-up'},
+    {era:'Ohtani IG at signing', value:'6.5M', delta:'Most followed MLB player', cls:'delta-up'},
+    {era:'Twitter / X growth', value:'+400K', delta:'Post-signing surge', cls:'delta-up'},
+    {era:'Fanatics jersey', value:'#1 ever', delta:'48-hour record', cls:'delta-up'},
+  ],
+  [
+    {era:'Dodgers Instagram', value:'~5M', delta:'↑ 67% vs baseline', cls:'delta-up'},
+    {era:'Ohtani personal IG', value:'7.5M', delta:'#1 MLB player globally', cls:'delta-up'},
+    {era:'Twitter / X followers', value:'~3M', delta:'↑ 20% vs baseline', cls:'delta-up'},
+    {era:'Combined social reach', value:'16M+', delta:'Dodgers + Ohtani', cls:'delta-up'},
+  ],
+  [
+    {era:'Dodgers Instagram', value:'6M+', delta:'↑ 100% vs baseline', cls:'delta-up'},
+    {era:'Ohtani personal IG', value:'8M+', delta:'2nd year back as pitcher', cls:'delta-up'},
+    {era:'Social reach (proj. 2030)', value:'~18M', delta:'Combined', cls:'delta-up'},
+    {era:'Global fan markets', value:'Japan #1', delta:'Also Mexico, Korea', cls:'delta-up'},
+  ],
+];
+
+const fvData = [
+  [
+    {era:'2023 (baseline)', value:'$4.8B', delta:'Forbes — pre-signing', cls:'delta-neutral'},
+    {era:'Revenue (2023)', value:'~$450M', delta:'Baseline', cls:'delta-neutral'},
+    {era:'MLB rank', value:'#2', delta:'Behind Yankees $7.1B', cls:'delta-neutral'},
+    {era:'Gap to Yankees', value:'$2.3B', delta:'Baseline gap', cls:'delta-neutral'},
+  ],
+  [
+    {era:'Value at signing', value:'$4.8B→', delta:'Anticipation rally begins', cls:'delta-up'},
+    {era:'Revenue forecast', value:'>$750M', delta:'Analyst projection', cls:'delta-up'},
+    {era:'New sponsors signed', value:'12', delta:'Japanese brands', cls:'delta-up'},
+    {era:'Contract NPV (Ohtani)', value:'~$462M', delta:'At 3% inflation discount', cls:'delta-neutral'},
+  ],
+  [
+    {era:'Value 2024', value:'~$6.2B', delta:'↑ $1.4B vs baseline', cls:'delta-up'},
+    {era:'Revenue 2024', value:'$1.0B+', delta:'MLB first ever', cls:'delta-up'},
+    {era:'Revenue sharing paid', value:'~$150M', delta:'Largest in MLB', cls:'delta-neutral'},
+    {era:'Gap to Yankees', value:'$0.6B', delta:'Closed from $2.3B', cls:'delta-up'},
+  ],
+  [
+    {era:'Value 2025–26', value:'$7.8B', delta:'↑ $3.0B vs baseline', cls:'delta-up'},
+    {era:'Value projected 2030', value:'~$10.5B', delta:'Sportico trend', cls:'delta-up'},
+    {era:'MLB rank', value:'#2', delta:'Closing on Yankees $8.4B', cls:'delta-up'},
+    {era:'Revenue 2025', value:'$1.0B+', delta:'2nd consecutive $1B yr', cls:'delta-up'},
+  ],
+];
+
+let currentEra = 0;
+
+function renderStats(containerId, data, era) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = data[era].map(s => `
+    <div class="stat-card anim">
+      <p class="stat-era">${s.era}</p>
+      <p class="stat-value">${s.value}</p>
+      <p class="stat-delta ${s.cls}">${s.delta}</p>
+    </div>`).join('');
+}
+
+function setEra(idx) {
+  currentEra = idx;
+  document.querySelectorAll('.era-btn').forEach((b,i) => b.classList.toggle('active', i === idx));
+  document.querySelectorAll('.era-highlight').forEach((el,i) => el.classList.toggle('show', i === idx));
+  renderStats('social-stats', socialData, idx);
+  renderStats('fv-stats', fvData, idx);
+}
+
+setEra(0);
+</script>
+</body>
+</html>
